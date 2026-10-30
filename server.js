@@ -1,30 +1,20 @@
 import { createServer } from 'node:http';
-import { existsSync, readFileSync } from 'node:fs';
-import { analyzeDocument, createClient, transcribeImage } from './lib/agent.js';
+import { readFileSync } from 'node:fs';
+import { analyzeDocument, transcribeImage } from './lib/agent.js';
+import { clientFromEnv, LANGUAGES as LANGUAGE_LIST, loadEnv, MAX_DOCUMENT } from './lib/config.js';
 import { redact } from './lib/report.js';
 
 const root = new URL('./', import.meta.url);
-const envFile = new URL('.env', root);
-if (existsSync(envFile)) {
-  for (const line of readFileSync(envFile, 'utf8').split('\n')) {
-    const match = /^\s*([A-Z_]+)\s*=\s*(.*?)\s*$/.exec(line);
-    if (match && !(match[1] in process.env)) process.env[match[1]] = match[2];
-  }
-}
+loadEnv();
 
 const PORT = Number(process.env.PORT ?? 3000);
 const HOST = process.env.HOST ?? '127.0.0.1';
 const API_KEY = process.env.BHARATCODE_API_KEY;
 const MAX_BODY = 10 * 1024 * 1024;
-const MAX_DOCUMENT = 40_000;
-const LANGUAGES = new Set(['English', 'Hindi', 'Hinglish', 'Bengali', 'Marathi', 'Tamil', 'Telugu']);
+const LANGUAGES = new Set(LANGUAGE_LIST);
 const IMAGE_PATTERN = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/;
 
-const chat = createClient({
-  apiKey: API_KEY,
-  baseUrl: process.env.BHARATCODE_BASE_URL ?? 'https://bharatcode.ai/api/model/v1',
-  model: process.env.BHARATCODE_MODEL ?? 'qwen-3.8-27b',
-});
+const chat = clientFromEnv();
 
 function readJson(request) {
   return new Promise((resolve, reject) => {

@@ -43,6 +43,17 @@ Open http://127.0.0.1:3000 and press **Try a sample**.
 npm test
 ```
 
+### From the terminal
+
+```bash
+npm link
+samjho notice.txt --lang hindi
+samjho photo.jpg
+cat notice.txt | samjho --json --quiet
+```
+
+The report goes to stdout and progress goes to stderr, so the output can be piped into other tools. Exit codes are 0 for success, 1 for a runtime failure and 2 for bad usage.
+
 The tests use a scripted mock of the API, so they don't need a key.
 
 ## Privacy and limits

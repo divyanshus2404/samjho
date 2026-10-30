@@ -5,6 +5,7 @@
   "type": "module",
   "license": "MIT",
   "engines": { "node": ">=20" },
+  "bin": { "samjho": "cli.js" },
   "scripts": {
     "start": "node server.js",
     "test": "node --test test/*.test.js"
