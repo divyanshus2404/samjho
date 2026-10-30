@@ -1,0 +1,4 @@
+Project: Samjho
+Direction: Everyday assistance
+Summary: Explains official notices and letters in plain language across Indian languages, and checks every quote, amount and deadline against the document.
+Model API: BharatCode (https://bharatcode.ai/api/model/v1), model qwen-3.8-27b, Chat Completions with function tools.

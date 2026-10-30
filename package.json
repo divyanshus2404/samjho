@@ -1,0 +1,12 @@
+{
+  "name": "samjho",
+  "version": "0.1.0",
+  "description": "Understand any official notice in your language, with every claim checked against the document.",
+  "type": "module",
+  "license": "MIT",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/*.test.js"
+  }
+}

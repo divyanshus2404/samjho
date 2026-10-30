@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Samjho</title>
+<style>
+  :root {
+    --bg: #f7f3ea; --card: #fffdf8; --ink: #22201b; --muted: #6b665b; --line: #ddd5c5;
+    --accent: #0f5c4d; --accent-ink: #fff; --ok: #1a6b43; --warn: #a3470f; --warn-bg: #fbeadd;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #171612; --card: #211f1a; --ink: #eee9dd; --muted: #a9a394; --line: #3a372e;
+      --accent: #5cc2a8; --accent-ink: #10201b; --ok: #6fce9b; --warn: #f0a26d; --warn-bg: #3a2517;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.55 system-ui, "Noto Sans", "Noto Sans Devanagari", sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 40px 16px 80px; }
+  h1 { font: 700 2.4rem/1.1 Georgia, "Noto Serif Devanagari", serif; margin: 0 0 8px; }
+  h2 { font-size: .85rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 32px 0 10px; }
+  .lede { color: var(--muted); margin: 0 0 24px; }
+  textarea { width: 100%; min-height: 220px; padding: 14px; background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; font: inherit; font-size: 16px; resize: vertical; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 12px; }
+  button, select, .file { font: inherit; font-size: 15px; min-height: 44px; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; display: inline-flex; align-items: center; }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; margin-left: auto; }
+  button:disabled { opacity: .55; cursor: wait; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  input[type=file] { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .note { font-size: .85rem; color: var(--muted); margin-top: 14px; }
+  #progress { list-style: none; padding: 0; margin: 24px 0 0; font-size: .9rem; color: var(--muted); }
+  #error { background: var(--warn-bg); color: var(--warn); padding: 12px 14px; border-radius: 8px; margin-top: 20px; }
+  .summary { font-size: 1.15rem; margin: 0; }
+  .meta { color: var(--muted); font-size: .9rem; margin: 0 0 8px; }
+  .item { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; }
+  .item strong { display: block; }
+  .quote { display: block; border-left: 3px solid var(--line); padding-left: 10px; margin-top: 8px; color: var(--muted); font-size: .9rem; overflow-wrap: anywhere; }
+  .badge { display: inline-block; font-size: .78rem; font-weight: 600; margin-top: 6px; color: var(--ok); }
+  .badge.bad { color: var(--warn); }
+  .when { font-weight: 700; color: var(--accent); }
+  .urgent { color: var(--warn); }
+  pre { white-space: pre-wrap; font: inherit; margin: 0; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Samjho</h1>
+  <p class="lede">Got a notice you don't understand? Get a plain explanation in your language, with every claim checked against the document.</p>
+
+  <label for="doc" hidden>Document text</label>
+  <textarea id="doc" placeholder="Paste the notice, letter or agreement here, or upload a photo."></textarea>
+  <div class="row">
+    <label class="file">Upload photo<input id="file" type="file" accept="image/jpeg,image/png,image/webp"></label>
+    <button id="sample" type="button">Try a sample</button>
+    <select id="language" aria-label="Explanation language">
+      <option>English</option><option>Hindi</option><option>Hinglish</option><option>Bengali</option><option>Marathi</option><option>Tamil</option><option>Telugu</option>
+    </select>
+    <button id="go" class="primary" type="button">Explain this</button>
+  </div>
+  <p class="note">Aadhaar, PAN, phone, email and account numbers in text are hidden before the model sees them. Photos are sent as they are, so cover private details first. Documents are processed by BharatCode's model API and its inference partners. This is general information, not legal advice.</p>
+
+  <div id="error" role="alert" hidden></div>
+  <ul id="progress" aria-live="polite"></ul>
+  <div id="result"></div>
+</main>
+<script>
+const SAMPLE = `SHARMA PROPERTIES
+12, MG Road, Pune 411001
+
+Date: 20 October 2026
+
+To: Mr. Ravi Kumar, Flat 304, Green Heights, Pune
+
+Subject: Notice for unpaid rent and vacating the premises
+
+You have not paid rent of Rs. 18,000 per month for August, September and October 2026. Late fee of Rs. 2,500 is also due under Clause 7 of the rent agreement dated 1 April 2025.
+
+You are required to pay the total dues within 15 days of the date of this notice. If you fail to do so, the agreement shall stand terminated and you must vacate the flat within 30 days of the date of this notice.
+
+The security deposit of Rs. 36,000 may be adjusted against unpaid dues as per Clause 9.
+
+Failure to comply may result in legal proceedings before the competent court.
+
+Authorised Signatory, Sharma Properties`;
+
+const $ = (id) => document.getElementById(id);
+const el = (tag, className, text) => {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+};
+
+function showError(message) {
+  $('error').textContent = message;
+  $('error').hidden = !message;
+}
+function setBusy(busy) {
+  $('go').disabled = busy;
+  $('file').disabled = busy;
+}
+function progress(text) {
+  $('progress').append(el('li', '', text));
+}
+function localToday() {
+  const now = new Date();
+  return new Date(now - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+}
+
+function describeStep(step) {
+  switch (step.type) {
+    case 'thinking': return step.turn === 1 ? 'Reading the document…' : 'Working through the details…';
+    case 'tool':
+      if (step.name === 'date_add') return `Calculated a date: ${step.result.date}`;
+      if (step.name === 'sum_amounts') return `Added up amounts: ₹${step.result.total.toLocaleString('en-IN')}`;
+      return `Looked up "${step.args.query}" in the document`;
+    case 'verify': return step.problems ? `Found ${step.problems} claim(s) not supported by the document` : 'Every quote matched the document';
+    case 'retry': return 'Trying again with more room…';
+    default: return null;
+  }
+}
+
+function badge(verified) {
+  return el('span', verified ? 'badge' : 'badge bad', verified ? '✓ Found in document' : '⚠ Not verified, check this yourself');
+}
+
+function section(parent, title, items, build) {
+  if (!items || !items.length) return;
+  parent.append(el('h2', '', title));
+  for (const item of items) {
+    const card = el('div', 'item');
+    build(card, item);
+    parent.append(card);
+  }
+}
+
+function addQuote(card, item) {
+  card.append(el('span', 'quote', item.quote), badge(item.verified));
+}
+
+function deadlineText(item) {
+  if (!item.date) return 'Date depends on when you received this';
+  const date = new Date(item.date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+  if (item.days_left < 0) return `${date} (passed ${-item.days_left} days ago)`;
+  if (item.days_left === 0) return `${date} (today)`;
+  return `${date} (${item.days_left} days left)`;
+}
+
+function render(report) {
+  const out = $('result');
+  out.replaceChildren();
+  out.append(el('h2', '', `${report.urgency} urgency`));
+  out.append(el('p', 'meta', `${report.doc_type} · ${report.sender}`));
+  out.append(el('p', 'summary', report.summary));
+
+  section(out, 'Deadlines', report.deadlines, (card, item) => {
+    const late = item.date && item.days_left <= 7;
+    card.append(el('span', late ? 'when urgent' : 'when', deadlineText(item)), el('strong', '', item.label));
+    addQuote(card, item);
+  });
+  section(out, 'Money', report.amounts, (card, item) => {
+    card.append(el('span', 'when', `₹${Number(item.amount).toLocaleString('en-IN')}`), el('strong', '', item.label));
+    addQuote(card, item);
+  });
+  section(out, 'What it says', report.key_points, (card, item) => {
+    card.append(el('div', '', item.text));
+    addQuote(card, item);
+  });
+  section(out, 'What to do', report.actions, (card, item) => {
+    card.append(el('strong', '', item.step), el('div', 'meta', item.why));
+  });
+  section(out, 'When to get help', report.get_help ? [report.get_help] : [], (card, text) => card.append(el('div', '', text)));
+  section(out, 'Draft reply', report.draft_reply ? [report.draft_reply] : [], (card, text) => {
+    const copy = el('button', '', 'Copy');
+    copy.type = 'button';
+    copy.onclick = async () => {
+      await navigator.clipboard.writeText(text);
+      copy.textContent = 'Copied';
+    };
+    card.append(el('pre', '', text), copy);
+  });
+}
+
+async function explain() {
+  showError('');
+  $('progress').replaceChildren();
+  $('result').replaceChildren();
+  setBusy(true);
+  try {
+    const response = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: $('doc').value, language: $('language').value, today: localToday() }),
+    });
+    if (!response.ok) throw new Error((await response.json()).error);
+
+    const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+    let buffer = '';
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += value;
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      for (const line of lines) {
+        if (!line) continue;
+        const event = JSON.parse(line);
+        if (event.type === 'redacted') $('doc').value = event.document;
+        else if (event.type === 'report') render(event.report);
+        else if (event.type === 'error') throw new Error(event.error);
+        else {
+          const text = describeStep(event);
+          if (text) progress(text);
+        }
+      }
+    }
+  } catch (error) {
+    showError(error.message);
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function upload(file) {
+  showError('');
+  $('progress').replaceChildren();
+  setBusy(true);
+  progress('Reading the photo…');
+  try {
+    const image = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error('Could not read that file.'));
+      reader.readAsDataURL(file);
+    });
+    const response = await fetch('/api/transcribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image }),
+    });
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.error);
+    $('doc').value = body.text;
+    progress('Check the text above against your photo, fix any mistakes, then press Explain this.');
+  } catch (error) {
+    showError(error.message);
+  } finally {
+    setBusy(false);
+  }
+}
+
+$('go').onclick = explain;
+$('sample').onclick = () => { $('doc').value = SAMPLE; };
+$('file').onchange = (event) => { if (event.target.files[0]) upload(event.target.files[0]); event.target.value = ''; };
+</script>
+</body>
+</html>
