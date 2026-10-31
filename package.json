@@ -4,10 +4,18 @@
   "description": "Understand any official notice in your language, with every claim checked against the document.",
   "type": "module",
   "license": "MIT",
-  "engines": { "node": ">=20" },
-  "bin": { "samjho": "cli.js" },
+  "engines": {
+    "node": ">=20.19"
+  },
+  "bin": {
+    "samjho": "cli.js"
+  },
   "scripts": {
     "start": "node server.js",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "eval": "node evals/run.js"
+  },
+  "dependencies": {
+    "pdfjs-dist": "5.5.207"
   }
 }

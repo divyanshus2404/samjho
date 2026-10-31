@@ -1,4 +1,50 @@
-Project: Samjho
+Samjho: understand any official notice, with every claim checked
+================================================================
+
 Direction: Everyday assistance
-Summary: Explains official notices and letters in plain language across Indian languages, and checks every quote, amount and deadline against the document.
-Model API: BharatCode (https://bharatcode.ai/api/model/v1), model qwen-3.8-27b, Chat Completions with function tools.
+Formats: command-line tool and web app
+
+The problem
+-----------
+A landlord's notice, tax letter or bank demand can be frightening when you
+can't follow the language. Missing a deadline can cost money or a home. A
+general chatbot can explain a notice, but it can also invent a section number
+or get a deadline wrong, and the reader has no way to tell.
+
+What it does
+------------
+Give Samjho a PDF, a photo or pasted text, and choose English, Hindi, Hinglish,
+Bengali, Marathi, Tamil or Telugu. It returns a plain summary, deadlines with
+days left, amounts, next steps, when to get help and a draft reply. You can ask
+follow-up questions and save verified deadlines to your calendar.
+
+How BharatCode is used
+----------------------
+BharatCode is the only model provider, and it powers every model call.
+  Base URL: https://bharatcode.ai/api/model/v1
+  Model:    qwen-3.8-27b (change with BHARATCODE_MODEL)
+  API:      Chat Completions with function tools and image input
+  Key:      BHARATCODE_API_KEY, the only key needed
+
+The harness
+-----------
+1. Redact: identity, contact and account numbers are removed from text before
+   any model call.
+2. Read: PDFs are converted to text locally. Photos are transcribed by the model.
+3. Agent loop: the model calls date_add, sum_amounts and search_document, then
+   submit_report.
+4. Verify: code checks every quote against the document and every amount against
+   its quote, and recalculates relative deadlines.
+5. Repair: failed claims go back to the model once. Anything still unsupported
+   is shown with a warning.
+
+Text inside a document is treated as data, not as instructions.
+
+Try it
+------
+  npm install
+  cp .env.example .env     (then add your key)
+  npm start                (web app)
+  npm link
+  samjho notice.pdf --lang hindi
+  npm run eval             (accuracy test on the real model)

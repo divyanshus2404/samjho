@@ -1,8 +1,9 @@
 #!/usr/bin/env node
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { extname } from 'node:path';
 import { parseArgs } from 'node:util';
-import { analyzeDocument, transcribeImage } from './lib/agent.js';
+import { analyzeDocument, askDocument, transcribeImage } from './lib/agent.js';
+import { extractPdfText, toCalendar } from './lib/documents.js';
 import { clientFromEnv, LANGUAGES, loadEnv, MAX_DOCUMENT } from './lib/config.js';
 import { redact } from './lib/report.js';
 
@@ -10,10 +11,12 @@ const USAGE = `Usage: samjho <file> [options]
        cat notice.txt | samjho [options]
 
 Explains an official notice in plain language and checks each claim against it.
-<file> can be text, or a JPG, PNG or WebP photo.
+<file> can be text, a PDF, or a JPG, PNG or WebP photo.
 
 Options:
   -l, --lang <language>  ${LANGUAGES.join(', ')} (default: English)
+  -a, --ask <question>   Answer one question instead of writing a report
+      --calendar <file>  Save verified deadlines as a calendar (.ics) file
       --json             Print the report as JSON
       --quiet            Hide progress messages
   -h, --help             Show this help
@@ -58,6 +61,15 @@ function formatReport(report) {
   return lines.join('\n');
 }
 
+function formatAnswer(answer) {
+  const lines = [answer.answer];
+  if (!answer.in_document) lines.push('', 'This document does not answer that question.');
+  for (const item of answer.quotes) {
+    lines.push(`  "${item.quote}" ${item.verified ? '[found in document]' : '[NOT VERIFIED, check this yourself]'}`);
+  }
+  return lines.join('\n');
+}
+
 function describeStep(step) {
   if (step.type === 'tool' && step.name === 'date_add') return `Calculated a date: ${step.result.date}`;
   if (step.type === 'tool' && step.name === 'sum_amounts') return `Added up amounts: ${step.result.total}`;
@@ -73,6 +85,8 @@ try {
     allowPositionals: true,
     options: {
       lang: { type: 'string', short: 'l', default: 'English' },
+      ask: { type: 'string', short: 'a' },
+      calendar: { type: 'string' },
       json: { type: 'boolean', default: false },
       quiet: { type: 'boolean', default: false },
       help: { type: 'boolean', short: 'h', default: false },
@@ -108,11 +122,19 @@ try {
     const image = `data:image/${imageType};base64,${readFileSync(path).toString('base64')}`;
     text = await transcribeImage(chat, image);
     console.error(`Text read from the photo. Compare it with the original, because quotes are checked against this text:\n\n${redact(text)}\n`);
+  } else if (path && extname(path).toLowerCase() === '.pdf') {
+    text = await extractPdfText(readFileSync(path));
   } else {
     text = readFileSync(path ?? 0, 'utf8');
   }
   if (text.trim().length < 20) fail('Please give the full text of the document.', 2);
   if (text.length > MAX_DOCUMENT) fail('This document is too long. Please use the most important pages.', 2);
+
+  if (values.ask) {
+    const answer = await askDocument({ chat, document: redact(text), question: redact(values.ask), language, today: localToday() });
+    console.log(values.json ? JSON.stringify(answer, null, 2) : formatAnswer(answer));
+    process.exit(0);
+  }
 
   log('Reading the document...');
   const report = await analyzeDocument({
@@ -126,6 +148,15 @@ try {
     },
   });
   console.log(values.json ? JSON.stringify(report, null, 2) : formatReport(report));
+  if (values.calendar) {
+    const calendar = toCalendar(report);
+    if (calendar) {
+      writeFileSync(values.calendar, calendar);
+      log(`Saved deadlines to ${values.calendar}`);
+    } else {
+      log('No dated, verified deadlines to save, so no calendar file was written.');
+    }
+  }
 } catch (error) {
   fail(error.message);
 }
